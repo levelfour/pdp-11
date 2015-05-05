@@ -2,6 +2,38 @@ open Printf
 
 type byte = int
 
+exception OutOfRange
+
+(* read word from stream according to little-endian *)
+let rec readw i stream =
+    if i = 0 then
+        try
+            (List.nth stream 0) + ((List.nth stream 1) lsl 8)
+        with e -> raise e
+    else
+        match stream with
+        | _::tl -> readw (i-1) tl
+        | [] -> raise OutOfRange
+
+(* a.out file format *)
+class a_out_format (stream: byte list) =
+    object(self)
+        val a_magic  = readw  0 stream
+        val a_text   = readw  2 stream
+        val a_data   = readw  4 stream
+        val a_bss    = readw  6 stream
+        val a_syms   = readw  8 stream
+        val a_entry  = readw 10 stream
+        val a_trsize = readw 12 stream
+        val a_drsize = readw 14 stream
+        val code     = ExtList.List.drop 16 stream
+        method magic     = a_magic
+        method text_size = a_text
+        method data_size = a_data
+        method entry     = a_entry
+        method code      = code
+    end
+
 (* read in_channel in binary mode and returns byte list *)
 let rec read_bin ic = 
     try
@@ -21,19 +53,16 @@ let xxd s =
         | [] -> ()
     in xxd_sub s 1
 
-(* extract a.out header info from byte list *)
-open ExtLib
-
-let a_out_header stream =
-    (ExtList.List.take 16 stream, ExtList.List.drop 16 stream)
-
 let _ =
     if Array.length Sys.argv < 2 then
         printf "Too few args\n"
     else
         let ic = open_in_bin Sys.argv.(1) in
         try
-            xxd (read_bin ic);
+            let bin = new a_out_format (read_bin ic) in
+            printf "TextSize=%d(B), DataSize=%d(B)\n"
+                bin#text_size bin#data_size;
+            xxd bin#code;
             flush stdout;
             close_in ic
         with e ->

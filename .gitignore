@@ -1,0 +1,14 @@
+# OCaml
+*.o
+*.opt
+*.cmi
+*.cmo
+*.cmx
+*.omc
+
+# OMake
+.omakedb
+.omakedb.lock
+
+# misc
+.DS_Store
