@@ -1,6 +1,7 @@
 .PHONY: all clean
 
 FILES[] =
+	pdp11
 	binary
 
 USE_OCAMLFIND = true
