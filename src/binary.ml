@@ -3,6 +3,7 @@ open Printf
 type byte = int
 
 exception OutOfRange
+exception InvalidMode
 
 let fst tuple =
     match tuple with
@@ -32,46 +33,132 @@ let rec readw i stream =
         | [] -> raise OutOfRange
 
 (* interpreter object of byte code *)
-class interpreter (inst: byte) =
+class interpreter (stream: byte list) =
     object(self)
-        val inst = inst
+        val inst = fst (popw stream)
+        val mutable residue = snd (popw stream)
+        method residue = residue
+        method addressing mode =
+            let oprand m =
+                let i = (m land 7) in
+                if i = 7 then
+                    let (v,code) = popw residue in
+                    residue <- code;
+                    match (m lsr 3) land 7 with
+                    | 2 -> sprintf "#%o"  v
+                    | 3 -> sprintf "@#%o" v
+                    | 6 -> string_of_int  v
+                    | 7 -> sprintf "@%o"  v
+                    | _ -> raise InvalidMode
+                else if i = 6 then
+                    "sp"
+                else sprintf "r%d" i
+            in
+            if (mode land 7) != 7 then
+                match (mode lsr 3) land 7 with
+                | 0 -> sprintf "%s"     (oprand mode)
+                | 1 -> sprintf "(%s)"   (oprand mode)
+                | 2 -> sprintf "(%s)+"  (oprand mode)
+                | 3 -> sprintf "@(%s)+" (oprand mode)
+                | 4 -> sprintf "-(%s)"  (oprand mode)
+                | 5 -> sprintf "@-(%s)" (oprand mode)
+                | 6 -> begin
+                    let (v,code) = popw residue in
+                    residue <- code;
+                    sprintf "%o(%s)" v (oprand mode)
+                end
+                | 7 -> sprintf "@X(%s)" (oprand mode)
+                | _ -> raise InvalidMode
+            else
+                oprand mode
         method interpret =
-            match (inst lsr 6) land 0o1777 with
-            | 0o0003 -> "swab"
-            | 0o0067 -> "sxt"
+            match inst with
+            | 0 -> "halt"
+            | 1 -> "wait"
+            | 2 -> "rti"
+            | 3 -> "bpt"
+            | 4 -> "iot"
+            | 5 -> "reset"
+            | 6 -> "rtt"
             | _ -> begin
-                match (inst lsr 6) land 0o777 with
-                | 0o050 -> "clr"
-                | 0o051 -> "com"
-                | 0o052 -> "inc"
-                | 0o053 -> "dec"
-                | 0o054 -> "neg"
-                | 0o055 -> "adc"
-                | 0o056 -> "sbc"
-                | 0o057 -> "tst"
-                | 0o060 -> "ror"
-                | 0o061 -> "rol"
-                | 0o062 -> "asr"
-                | 0o063 -> "asl"
+                match (inst lsr 3) with
+                | 0o00020 -> "rts"
                 | _ -> begin
-                    match (inst lsr 9) land 0o177 with
-                    | 0o070 -> "mul"
-                    | 0o071 -> "div"
-                    | 0o072 -> "ash"
-                    | 0o073 -> "ashc"
-                    | 0o074 -> "xor"
+                    match (inst lsr 5) with
+                    | 2 -> "; clear cond"
                     | _ -> begin
-                        match (inst lsr 12) land 0o17 with
-                        | 0o06 -> "add"
-                        | 0o16 -> "sub"
+                        match (inst lsr 6) land 0o1777 with
+                        | 0o0001 -> "jmp"
+                        | 0o0003 -> "swab"
+                        | 0o0064 -> "mark"
+                        | 0o0065 -> "mfpi"
+                        | 0o0066 -> "mtpi"
+                        | 0o0067 -> "sxt"
                         | _ -> begin
-                            match (inst lsr 12) land 0o7 with
-                            | 0o1 -> "mov"
-                            | 0o2 -> "cmp"
-                            | 0o3 -> "bit"
-                            | 0o4 -> "bic"
-                            | 0o5 -> "bis"
-                            | _ -> "?"
+                            match (inst lsr 6) land 0o777 with
+                            | 0o050 -> "clr"
+                            | 0o051 -> "com"
+                            | 0o052 -> "inc"
+                            | 0o053 -> "dec"
+                            | 0o054 -> "neg"
+                            | 0o055 -> "adc"
+                            | 0o056 -> "sbc"
+                            | 0o057 -> "tst"
+                            | 0o060 -> "ror"
+                            | 0o061 -> "rol"
+                            | 0o062 -> "asr"
+                            | 0o063 -> "asl"
+                            | _ -> begin
+                                match (inst lsr 7) with
+                                | 0b10001000 -> "emt"
+                                | 0b10001001 -> "trap"
+                                | _ -> begin
+                                    match (inst lsr 8) with
+                                    | 1 -> "br"
+                                    | 2 -> "bne"
+                                    | 3 -> "beq"
+                                    | 4 -> "bge"
+                                    | 5 -> "blt"
+                                    | 6 -> "bgt"
+                                    | 7 -> "ble"
+                                    | 128 -> "bpl"
+                                    | 129 -> "bmi"
+                                    | 130 -> "bhi"
+                                    | 131 -> "blos"
+                                    | 132 -> "bvc"
+                                    | 133 -> "bvs"
+                                    | 134 -> "bcc"
+                                    | 135 -> "bcs"
+                                    | _ -> begin
+                                        match (inst lsr 9) land 0o177 with
+                                        | 0o004 -> "jsr"
+                                        | 0o070 -> "mul"
+                                        | 0o071 -> "div"
+                                        | 0o072 -> "ash"
+                                        | 0o073 -> "ashc"
+                                        | 0o074 -> "xor"
+                                        | 0o077 -> "sob"
+                                        | _ -> begin
+                                            match (inst lsr 12) land 0o17 with
+                                            | 0o06 -> "add"
+                                            | 0o16 -> "sub"
+                                            | _ -> begin
+                                                match (inst lsr 12) land 0o7 with
+                                                | 0o1 -> begin
+                                                    let src = self#addressing (inst lsr 6) in
+                                                    let dst = self#addressing inst in
+                                                    sprintf "mov %s, %s" src dst
+                                                end
+                                                | 0o2 -> "cmp"
+                                                | 0o3 -> "bit"
+                                                | 0o4 -> "bic"
+                                                | 0o5 -> "bis"
+                                                | _ -> "?"
+                                            end
+                                        end
+                                    end
+                                end
+                            end
                         end
                     end
                 end
@@ -97,10 +184,10 @@ class a_out_format (stream: byte list) =
         method code      = code
         method disas     =
             try
-                let (inst,s) = popw code in
-                code <- s;
-                let itp = new interpreter (inst) in
-                itp#interpret;
+                let itp = new interpreter (code) in
+                let res = itp#interpret in
+                code <- itp#residue;
+                res
             with e ->
                 raise e
     end
