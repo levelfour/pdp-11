@@ -1,17 +1,10 @@
 open Printf
+open Utils
 
 type byte = int
 
 exception OutOfRange
 exception InvalidMode
-
-let fst tuple =
-    match tuple with
-    | (x,_) -> x
-
-let snd tuple =
-    match tuple with
-    | (_,y) -> y
 
 (* pop word from stream according to little-endian *)
 let popw stream =
@@ -65,7 +58,7 @@ class interpreter (stream: byte list) =
                 | 6 -> begin
                     let (v,code) = popw residue in
                     residue <- code;
-                    sprintf "%o(%s)" v (oprand mode)
+                    sprintf "%d(%s)" (signedw v) (oprand mode)
                 end
                 | 7 -> sprintf "@X(%s)" (oprand mode)
                 | _ -> raise InvalidMode

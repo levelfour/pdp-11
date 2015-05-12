@@ -3,6 +3,7 @@
 FILES[] =
 	pdp11
 	binary
+	utils
 
 USE_OCAMLFIND = true
 OCAMLPACKS[] =

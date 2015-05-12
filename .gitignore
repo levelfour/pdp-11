@@ -9,6 +9,7 @@
 # OMake
 .omakedb
 .omakedb.lock
+pdp11
 
 # misc
 .DS_Store
