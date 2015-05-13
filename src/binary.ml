@@ -30,6 +30,7 @@ let rec readw i stream =
 class interpreter (stream: byte list) =
     object(self)
         val inst = fst (popw stream)
+        val mutable bytecode = [fst (popw stream)]
         val mutable residue = snd (popw stream)
         method residue = residue
         method addressing mode =
@@ -37,6 +38,7 @@ class interpreter (stream: byte list) =
                 let i = (m land 7) in
                 if i = 7 then
                     let (v,code) = popw residue in
+                    bytecode <- bytecode @ [v];
                     residue <- code;
                     match (m lsr 3) land 7 with
                     | 2 -> sprintf "$%d"  (signedw v)
@@ -63,6 +65,7 @@ class interpreter (stream: byte list) =
                 | 6 -> begin
                     let (v,code) = popw residue in
                     residue <- code;
+                    bytecode <- bytecode @ [v];
                     sprintf "%d(%s)" (signedw v) (oprand mode)
                 end
                 | 7 -> sprintf "@X(%s)" (oprand mode)
@@ -70,35 +73,36 @@ class interpreter (stream: byte list) =
 
         method single_op_inst op inst =
             let dst = self#addressing inst in
-            sprintf "%s %s" op dst
+            sprintf "%s\t%s" op dst
 
         method single_reg_inst op inst =
             let reg = self#addressing (inst land 0b111) in
-            sprintf "%s %s" op reg
+            sprintf "%s\t%s" op reg
 
         method double_op_inst op inst =
             let src = self#addressing (inst lsr 6) in
             let dst = self#addressing inst in
-            sprintf "%s %s, %s" op src dst
+            sprintf "%s\t%s, %s" op src dst
 
         method reg_op_inst op inst =
             let reg = self#addressing ((inst lsr 6) land 7) in
             let src = self#addressing inst in
-            sprintf "%s %s, %s" op src reg
+            sprintf "%s\t%s, %s" op src reg
 
         method branch_insr op inst =
             let offset = (inst land 0xff) in
             let addr = 0 in
             match offset with
-            | 375 -> sprintf "%s %x" op (addr-3)
-            | 376 -> sprintf "%s %x" op (addr-2)
-            | 377 -> sprintf "%s %x" op (addr-1)
-            | 000 -> sprintf "%s %x" op (addr)
-            | 001 -> sprintf "%s %x" op (addr+1)
-            | 002 -> sprintf "%s %x" op (addr+2)
+            | 375 -> sprintf "%s\t%x" op (addr-3)
+            | 376 -> sprintf "%s\t%x" op (addr-2)
+            | 377 -> sprintf "%s\t%x" op (addr-1)
+            | 000 -> sprintf "%s\t%x" op (addr)
+            | 001 -> sprintf "%s\t%x" op (addr+1)
+            | 002 -> sprintf "%s\t%x" op (addr+2)
             | _ -> raise InvalidOffset
 
         method interpret =
+            let asm =
             match inst with
             | 0 -> "halt"
             | 1 -> "wait"
@@ -186,6 +190,7 @@ class interpreter (stream: byte list) =
                     end
                 end
             end
+            in (bytecode, asm)
     end
 
 (* a.out file format *)
@@ -200,6 +205,7 @@ class a_out_format (stream: byte list) =
         val a_trsize = readw 12 stream
         val a_drsize = readw 14 stream
         val mutable code = ExtList.List.take (readw 2 stream) (ExtList.List.drop 16 stream)
+        val mutable pc = 0
         method magic     = a_magic
         method text_size = a_text
         method data_size = a_data
@@ -207,10 +213,12 @@ class a_out_format (stream: byte list) =
         method code      = code
         method disas     =
             try
-                let itp = new interpreter (code) in
-                let res = itp#interpret in
+                let itp             = new interpreter (code) in
+                let (bytecode, asm) = itp#interpret in
+                let cur_pc          = pc in
                 code <- itp#residue;
-                res
+                pc <- pc + (List.length bytecode);
+                (cur_pc, bytecode, asm)
             with e ->
                 raise e
     end

@@ -10,7 +10,11 @@ let _ =
             let bin = new a_out_format (read_bin ic) in
             let rec disasall binary =
                 try
-                    printf "%s\n" binary#disas;
+                    let (pc, bytecode, asm) = binary#disas in
+                    let hexcode bl =
+                        String.concat " " (List.map (fun x -> sprintf "%04x" x) bl)
+                    in
+                    printf "%+4x:\t%-*s %s\n" pc 15 (hexcode bytecode) asm;
                     disasall binary;
                 with OutOfRange ->
                     ()
