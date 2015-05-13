@@ -5,6 +5,7 @@ type byte = int
 
 exception OutOfRange
 exception InvalidMode
+exception InvalidOffset
 
 (* pop word from stream according to little-endian *)
 let popw stream =
@@ -38,7 +39,8 @@ class interpreter (stream: byte list) =
                     let (v,code) = popw residue in
                     residue <- code;
                     match (m lsr 3) land 7 with
-                    | 2 -> sprintf "#%o"  v
+                    | 0 -> sprintf "$%o"  v
+                    | 2 -> sprintf "$%o"  v
                     | 3 -> sprintf "@#%o" v
                     | 6 -> string_of_int  v
                     | 7 -> sprintf "@%o"  v
@@ -64,6 +66,37 @@ class interpreter (stream: byte list) =
                 | _ -> raise InvalidMode
             else
                 oprand mode
+
+        method single_op_inst op inst =
+            let dst = self#addressing inst in
+            sprintf "%s %s" op dst
+
+        method single_reg_inst op inst =
+            let reg = self#addressing (inst land 0b111) in
+            sprintf "%s %s" op reg
+
+        method double_op_inst op inst =
+            let src = self#addressing (inst lsr 6) in
+            let dst = self#addressing inst in
+            sprintf "%s %s, %s" op src dst
+
+        method reg_op_inst op inst =
+            let reg = self#addressing ((inst lsr 6) land 7) in
+            let target = self#addressing inst in
+            sprintf "%s %s, %s" op target reg
+
+        method branch_insr op inst =
+            let offset = (inst land 0xff) in
+            let addr = 0 in
+            match offset with
+            | 375 -> sprintf "%s %x" op (addr-3)
+            | 376 -> sprintf "%s %x" op (addr-2)
+            | 377 -> sprintf "%s %x" op (addr-1)
+            | 000 -> sprintf "%s %x" op (addr)
+            | 001 -> sprintf "%s %x" op (addr+1)
+            | 002 -> sprintf "%s %x" op (addr+2)
+            | _ -> raise InvalidOffset
+
         method interpret =
             match inst with
             | 0 -> "halt"
@@ -75,77 +108,73 @@ class interpreter (stream: byte list) =
             | 6 -> "rtt"
             | _ -> begin
                 match (inst lsr 3) with
-                | 0o00020 -> "rts"
+                | 0o00020 -> self#single_reg_inst "rts" inst
                 | _ -> begin
                     match (inst lsr 5) with
                     | 2 -> "; clear cond"
                     | _ -> begin
                         match (inst lsr 6) land 0o1777 with
-                        | 0o0001 -> "jmp"
-                        | 0o0003 -> "swab"
+                        | 0o0001 -> self#single_op_inst "jmp" inst
+                        | 0o0003 -> self#single_op_inst "swab" inst
                         | 0o0064 -> "mark"
                         | 0o0065 -> "mfpi"
                         | 0o0066 -> "mtpi"
-                        | 0o0067 -> "sxt"
+                        | 0o0067 -> self#single_op_inst "sxt" inst
                         | _ -> begin
                             match (inst lsr 6) land 0o777 with
-                            | 0o050 -> "clr"
-                            | 0o051 -> "com"
-                            | 0o052 -> "inc"
-                            | 0o053 -> "dec"
-                            | 0o054 -> "neg"
-                            | 0o055 -> "adc"
-                            | 0o056 -> "sbc"
-                            | 0o057 -> "tst"
-                            | 0o060 -> "ror"
-                            | 0o061 -> "rol"
-                            | 0o062 -> "asr"
-                            | 0o063 -> "asl"
+                            | 0o050 -> self#single_op_inst (if (inst lsr 15) == 1 then "clrb" else "clr") inst
+                            | 0o051 -> self#single_op_inst (if (inst lsr 15) == 1 then "comb" else "com") inst
+                            | 0o052 -> self#single_op_inst (if (inst lsr 15) == 1 then "incb" else "inc") inst
+                            | 0o053 -> self#single_op_inst (if (inst lsr 15) == 1 then "decb" else "dec") inst
+                            | 0o054 -> self#single_op_inst (if (inst lsr 15) == 1 then "negb" else "neg") inst
+                            | 0o055 -> self#single_op_inst (if (inst lsr 15) == 1 then "adcb" else "adc") inst
+                            | 0o056 -> self#single_op_inst (if (inst lsr 15) == 1 then "sbcb" else "sbc") inst
+                            | 0o057 -> self#single_op_inst (if (inst lsr 15) == 1 then "tstb" else "tst") inst
+                            | 0o060 -> self#single_op_inst (if (inst lsr 15) == 1 then "rorb" else "ror") inst
+                            | 0o061 -> self#single_op_inst (if (inst lsr 15) == 1 then "rolb" else "rol") inst
+                            | 0o062 -> self#single_op_inst (if (inst lsr 15) == 1 then "asrb" else "asr") inst
+                            | 0o063 -> self#single_op_inst (if (inst lsr 15) == 1 then "aslb" else "asl") inst
                             | _ -> begin
                                 match (inst lsr 7) with
                                 | 0b10001000 -> "emt"
                                 | 0b10001001 -> "trap"
                                 | _ -> begin
                                     match (inst lsr 8) with
-                                    | 1 -> "br"
-                                    | 2 -> "bne"
-                                    | 3 -> "beq"
-                                    | 4 -> "bge"
-                                    | 5 -> "blt"
-                                    | 6 -> "bgt"
-                                    | 7 -> "ble"
-                                    | 128 -> "bpl"
-                                    | 129 -> "bmi"
-                                    | 130 -> "bhi"
-                                    | 131 -> "blos"
-                                    | 132 -> "bvc"
-                                    | 133 -> "bvs"
-                                    | 134 -> "bcc"
-                                    | 135 -> "bcs"
+                                    | 1 -> self#branch_insr "br" inst
+                                    | 2 -> self#branch_insr "bne" inst
+                                    | 3 -> self#branch_insr "beq" inst
+                                    | 4 -> self#branch_insr "bge" inst
+                                    | 5 -> self#branch_insr "blt" inst
+                                    | 6 -> self#branch_insr "bgt" inst
+                                    | 7 -> self#branch_insr "ble" inst
+                                    | 128 -> self#branch_insr "bpl" inst
+                                    | 129 -> self#branch_insr "bmi" inst
+                                    | 130 -> self#branch_insr "bhi" inst
+                                    | 131 -> self#branch_insr "blos" inst
+                                    | 132 -> self#branch_insr "bvc" inst
+                                    | 133 -> self#branch_insr "bvs" inst
+                                    | 134 -> self#branch_insr "bcc" inst
+                                    | 135 -> self#branch_insr "bcs" inst
                                     | _ -> begin
                                         match (inst lsr 9) land 0o177 with
-                                        | 0o004 -> "jsr"
-                                        | 0o070 -> "mul"
-                                        | 0o071 -> "div"
-                                        | 0o072 -> "ash"
-                                        | 0o073 -> "ashc"
-                                        | 0o074 -> "xor"
+                                        | 0o004 -> self#reg_op_inst "jsr" inst
+                                        | 0o070 -> self#reg_op_inst "mul" inst
+                                        | 0o071 -> self#reg_op_inst "div" inst
+                                        | 0o072 -> self#reg_op_inst "ash" inst
+                                        | 0o073 -> self#reg_op_inst "ashc" inst
+                                        | 0o074 -> self#reg_op_inst "xor" inst
                                         | 0o077 -> "sob"
                                         | _ -> begin
                                             match (inst lsr 12) land 0o17 with
-                                            | 0o06 -> "add"
-                                            | 0o16 -> "sub"
+                                            | 0o06 -> self#double_op_inst "add" inst
+                                            | 0o16 -> self#double_op_inst "sub" inst
                                             | _ -> begin
                                                 match (inst lsr 12) land 0o7 with
-                                                | 0o1 -> begin
-                                                    let src = self#addressing (inst lsr 6) in
-                                                    let dst = self#addressing inst in
-                                                    sprintf "mov %s, %s" src dst
-                                                end
-                                                | 0o2 -> "cmp"
-                                                | 0o3 -> "bit"
-                                                | 0o4 -> "bic"
-                                                | 0o5 -> "bis"
+                                                | 0o1 -> self#double_op_inst (if (inst lsr 15) == 1 then "movb" else "mov") inst
+                                                | 0o2 -> self#double_op_inst (if (inst lsr 15) == 1 then "cmpb" else "cmp") inst
+                                                | 0o3 -> self#double_op_inst (if (inst lsr 15) == 1 then "bitb" else "bit") inst
+                                                | 0o4 -> self#double_op_inst (if (inst lsr 15) == 1 then "bicb" else "bic") inst
+                                                | 0o5 -> self#double_op_inst (if (inst lsr 15) == 1 then "bisb" else "bis") inst
                                                 | _ -> "?"
                                             end
                                         end

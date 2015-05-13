@@ -19,3 +19,8 @@ After installation, you can run ``omake`` to build. Then ``pdp11`` will be gener
 ```
 ./pdp11 [a.out-pdp11 formatted binary]
 ```
+
+## Bug list
+
++ jsr
++ rts
