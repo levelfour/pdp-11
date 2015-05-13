@@ -39,17 +39,20 @@ class interpreter (stream: byte list) =
                     let (v,code) = popw residue in
                     residue <- code;
                     match (m lsr 3) land 7 with
-                    | 0 -> sprintf "$%o"  v
-                    | 2 -> sprintf "$%o"  v
-                    | 3 -> sprintf "@#%o" v
-                    | 6 -> string_of_int  v
-                    | 7 -> sprintf "@%o"  v
+                    | 2 -> sprintf "$%d"  (signedw v)
+                    | 3 -> sprintf "@#%d" (signedw v)
+                    | 6 -> string_of_int  (signedw v)
+                    | 7 -> sprintf "@%d"  (signedw v)
                     | _ -> raise InvalidMode
                 else if i = 6 then
                     "sp"
                 else sprintf "r%d" i
             in
-            if (mode land 7) != 7 then
+            if (mode land 7) = 7 then
+                match (mode lsr 3) land 7 with
+                | 0 -> "pc"
+                | _ -> oprand mode
+            else
                 match (mode lsr 3) land 7 with
                 | 0 -> sprintf "%s"     (oprand mode)
                 | 1 -> sprintf "(%s)"   (oprand mode)
@@ -64,8 +67,6 @@ class interpreter (stream: byte list) =
                 end
                 | 7 -> sprintf "@X(%s)" (oprand mode)
                 | _ -> raise InvalidMode
-            else
-                oprand mode
 
         method single_op_inst op inst =
             let dst = self#addressing inst in
@@ -82,8 +83,8 @@ class interpreter (stream: byte list) =
 
         method reg_op_inst op inst =
             let reg = self#addressing ((inst lsr 6) land 7) in
-            let target = self#addressing inst in
-            sprintf "%s %s, %s" op target reg
+            let src = self#addressing inst in
+            sprintf "%s %s, %s" op src reg
 
         method branch_insr op inst =
             let offset = (inst land 0xff) in

@@ -22,5 +22,3 @@ After installation, you can run ``omake`` to build. Then ``pdp11`` will be gener
 
 ## Bug list
 
-+ jsr
-+ rts
