@@ -42,7 +42,7 @@ class interpreter (pc: int) (stream: byte list) =
                     bytecode <- bytecode @ [v];
                     residue <- code;
                     match (m lsr 3) land 7 with
-                    | 2 -> sprintf "$%d"  (signedw v)
+                    | 2 -> sprintf "$%s"  (signedo v)
                     | 3 -> sprintf "@#%d" (signedw v)
                     | 6 -> string_of_int  ((signedw v) + pc + 2)
                     | 7 -> sprintf "@%d"  (signedw v)
@@ -68,7 +68,7 @@ class interpreter (pc: int) (stream: byte list) =
                     pc <- pc + 2;
                     residue <- code;
                     bytecode <- bytecode @ [v];
-                    sprintf "%d(%s)" (signedw v) (oprand mode)
+                    sprintf "%s(%s)" (signedo v) (oprand mode)
                 end
                 | 7 -> sprintf "@X(%s)" (oprand mode)
                 | _ -> raise InvalidMode
@@ -98,7 +98,7 @@ class interpreter (pc: int) (stream: byte list) =
 
         method branch_insr op inst =
             let offset = (inst land 0xff) in
-            sprintf "%s\t%x" op ((signedw offset) * 2 + pc + 2)
+            sprintf "%s\t%x" op ((signedb offset) * 2 + pc + 2)
 
         method interpret =
             let asm =
