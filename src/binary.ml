@@ -5,7 +5,6 @@ type byte = int
 
 exception OutOfRange
 exception InvalidMode
-exception InvalidOffset
 
 (* pop word from stream according to little-endian *)
 let popw stream =
@@ -99,15 +98,7 @@ class interpreter (pc: int) (stream: byte list) =
 
         method branch_insr op inst =
             let offset = (inst land 0xff) in
-            let addr = 0 in
-            match offset with
-            | 375 -> sprintf "%s\t%x" op (addr-3)
-            | 376 -> sprintf "%s\t%x" op (addr-2)
-            | 377 -> sprintf "%s\t%x" op (addr-1)
-            | 000 -> sprintf "%s\t%x" op (addr)
-            | 001 -> sprintf "%s\t%x" op (addr+1)
-            | 002 -> sprintf "%s\t%x" op (addr+2)
-            | _ -> raise InvalidOffset
+            sprintf "%s\t%x" op ((signedw offset) * 2 + pc + 2)
 
         method interpret =
             let asm =
