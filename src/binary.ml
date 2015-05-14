@@ -27,9 +27,10 @@ let rec readw i stream =
         | [] -> raise OutOfRange
 
 (* interpreter object of byte code *)
-class interpreter (stream: byte list) =
+class interpreter (pc: int) (stream: byte list) =
     object(self)
         val inst = fst (popw stream)
+        val mutable pc = pc
         val mutable bytecode = [fst (popw stream)]
         val mutable residue = snd (popw stream)
         method residue = residue
@@ -38,12 +39,13 @@ class interpreter (stream: byte list) =
                 let i = (m land 7) in
                 if i = 7 then
                     let (v,code) = popw residue in
+                    pc <- pc + 2;
                     bytecode <- bytecode @ [v];
                     residue <- code;
                     match (m lsr 3) land 7 with
                     | 2 -> sprintf "$%d"  (signedw v)
                     | 3 -> sprintf "@#%d" (signedw v)
-                    | 6 -> string_of_int  (signedw v)
+                    | 6 -> string_of_int  ((signedw v) + pc + 2)
                     | 7 -> sprintf "@%d"  (signedw v)
                     | _ -> raise InvalidMode
                 else if i = 6 then
@@ -64,6 +66,7 @@ class interpreter (stream: byte list) =
                 | 5 -> sprintf "@-(%s)" (oprand mode)
                 | 6 -> begin
                     let (v,code) = popw residue in
+                    pc <- pc + 2;
                     residue <- code;
                     bytecode <- bytecode @ [v];
                     sprintf "%d(%s)" (signedw v) (oprand mode)
@@ -88,6 +91,11 @@ class interpreter (stream: byte list) =
             let reg = self#addressing ((inst lsr 6) land 7) in
             let src = self#addressing inst in
             sprintf "%s\t%s, %s" op src reg
+
+        method jsr_inst op inst =
+            let reg = self#addressing ((inst lsr 6) land 7) in
+            let src = self#addressing inst in
+            sprintf "%s\t%s, %s" op reg src
 
         method branch_insr op inst =
             let offset = (inst land 0xff) in
@@ -162,7 +170,7 @@ class interpreter (stream: byte list) =
                                     | 135 -> self#branch_insr "bcs" inst
                                     | _ -> begin
                                         match (inst lsr 9) land 0o177 with
-                                        | 0o004 -> self#reg_op_inst "jsr" inst
+                                        | 0o004 -> self#jsr_inst    "jsr" inst
                                         | 0o070 -> self#reg_op_inst "mul" inst
                                         | 0o071 -> self#reg_op_inst "div" inst
                                         | 0o072 -> self#reg_op_inst "ash" inst
@@ -213,11 +221,11 @@ class a_out_format (stream: byte list) =
         method code      = code
         method disas     =
             try
-                let itp             = new interpreter (code) in
+                let itp             = new interpreter pc code in
                 let (bytecode, asm) = itp#interpret in
                 let cur_pc          = pc in
                 code <- itp#residue;
-                pc <- pc + (List.length bytecode);
+                pc <- pc + (List.length bytecode) * 2;
                 (cur_pc, bytecode, asm)
             with e ->
                 raise e
