@@ -101,7 +101,7 @@ class interpreter (pc: int) (stream: byte list) =
             sprintf "%s\t%x" op ((signedb offset) * 2 + pc + 2)
 
         method interpret =
-            let asm =
+            let asm = if ((inst lsr 12) land 15) = 0o17 then self#fp else
             match inst with
             | 0 -> "halt"
             | 1 -> "wait"
@@ -190,6 +190,15 @@ class interpreter (pc: int) (stream: byte list) =
                 end
             end
             in (bytecode, asm)
+
+        method fp =
+            match inst with
+            | 0o170000 -> "cfcc"
+            | 0o170001 -> "setf"
+            | 0o170002 -> "seti"
+            | 0o170011 -> "setd"
+            | 0o170012 -> "setl"
+            | _ -> "[fp]"
     end
 
 (* a.out file format *)
