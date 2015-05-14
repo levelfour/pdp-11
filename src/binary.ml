@@ -196,6 +196,19 @@ class interpreter (pc: int) (stream: byte list) =
             let fsrc = self#addressing (inst land 0o77) ~fp:true in
             sprintf "%s\t%s, %s" op fsrc ac
 
+        method f2_inst op inst =
+            let fdst = self#addressing (inst land 0o77) ~fp:true in
+            sprintf "%s\t%s" op fdst
+
+        method f3_inst op inst =
+            let ac = self#addressing ((inst lsr 6) land 3) ~fp:true in
+            let src = self#addressing (inst land 0o77) ~fp:false in
+            sprintf "%s\t%s, %s" op src ac
+
+        method f4_inst op inst =
+            let dst = self#addressing (inst land 0o77) ~fp:false in
+            sprintf "%s\t%s" op dst
+
         method fp =
             match inst with
             | 0o170000 -> "cfcc"
@@ -204,18 +217,32 @@ class interpreter (pc: int) (stream: byte list) =
             | 0o170011 -> "setd"
             | 0o170012 -> "setl"
             | _ -> begin
-                match ((inst lsr 8) land 15) with
-                | 0b0010 -> self#f1_inst "mulf" inst
-                | 0b0011 -> self#f1_inst "modf" inst
-                | 0b0100 -> self#f1_inst "addf" inst
-                | 0b0101 -> self#f1_inst "ldf" inst
-                | 0b0110 -> self#f1_inst "subf" inst
-                | 0b0111 -> self#f1_inst "cmpf" inst
-                | 0b1000 -> self#f1_inst "stf" inst
-                | 0b1001 -> self#f1_inst "divf" inst
-                | 0b1100 -> self#f1_inst "stcfd" inst
-                | 0b1111 -> self#f1_inst "ldcdf" inst
-                | _ -> "[fp]"
+                match ((inst lsr 6) land 0o77) with
+                | 0o01 -> self#f4_inst "ldfps" inst
+                | 0o02 -> self#f4_inst "stfps" inst
+                | 0o03 -> self#f4_inst "stst" inst
+                | 0o04 -> self#f2_inst "clrf" inst
+                | 0o05 -> self#f2_inst "tstf" inst
+                | 0o06 -> self#f2_inst "absf" inst
+                | 0o07 -> self#f2_inst "negf" inst
+                | _ -> begin
+                    match ((inst lsr 8) land 15) with
+                    | 0b0010 -> self#f1_inst "mulf" inst
+                    | 0b0011 -> self#f1_inst "modf" inst
+                    | 0b0100 -> self#f1_inst "addf" inst
+                    | 0b0101 -> self#f1_inst "ldf" inst
+                    | 0b0110 -> self#f1_inst "subf" inst
+                    | 0b0111 -> self#f1_inst "cmpf" inst
+                    | 0b1000 -> self#f1_inst "stf" inst
+                    | 0b1001 -> self#f1_inst "divf" inst
+                    | 0b1010 -> self#f3_inst "stexp" inst
+                    | 0b1011 -> self#f3_inst "stcfi" inst
+                    | 0b1100 -> self#f1_inst "stcfd" inst
+                    | 0b1101 -> self#f3_inst "ldexp" inst
+                    | 0b1110 -> self#f3_inst "ldcif" inst
+                    | 0b1111 -> self#f1_inst "ldcdf" inst
+                    | _ -> "?"
+                end
             end
     end
 
