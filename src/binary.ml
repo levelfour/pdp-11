@@ -33,7 +33,7 @@ class interpreter (pc: int) (stream: byte list) =
         val mutable bytecode = [fst (popw stream)]
         val mutable residue = snd (popw stream)
         method residue = residue
-        method addressing mode =
+        method addressing ?(fp=false) mode =
             let oprand m =
                 let i = (m land 7) in
                 if i = 7 then
@@ -49,7 +49,7 @@ class interpreter (pc: int) (stream: byte list) =
                     | _ -> raise InvalidMode
                 else if i = 6 then
                     "sp"
-                else sprintf "r%d" i
+                else sprintf (if fp then "fr%d" else "r%d") i
             in
             if (mode land 7) = 7 then
                 match (mode lsr 3) land 7 with
@@ -191,6 +191,11 @@ class interpreter (pc: int) (stream: byte list) =
             end
             in (bytecode, asm)
 
+        method f1_inst op inst =
+            let ac = self#addressing ((inst lsr 6) land 3) ~fp:true in
+            let fsrc = self#addressing (inst land 0o77) ~fp:true in
+            sprintf "%s\t%s, %s" op fsrc ac
+
         method fp =
             match inst with
             | 0o170000 -> "cfcc"
@@ -198,7 +203,20 @@ class interpreter (pc: int) (stream: byte list) =
             | 0o170002 -> "seti"
             | 0o170011 -> "setd"
             | 0o170012 -> "setl"
-            | _ -> "[fp]"
+            | _ -> begin
+                match ((inst lsr 8) land 15) with
+                | 0b0010 -> self#f1_inst "mulf" inst
+                | 0b0011 -> self#f1_inst "modf" inst
+                | 0b0100 -> self#f1_inst "addf" inst
+                | 0b0101 -> self#f1_inst "ldf" inst
+                | 0b0110 -> self#f1_inst "subf" inst
+                | 0b0111 -> self#f1_inst "cmpf" inst
+                | 0b1000 -> self#f1_inst "stf" inst
+                | 0b1001 -> self#f1_inst "divf" inst
+                | 0b1100 -> self#f1_inst "stcfd" inst
+                | 0b1111 -> self#f1_inst "ldcdf" inst
+                | _ -> "[fp]"
+            end
     end
 
 (* a.out file format *)
