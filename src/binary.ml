@@ -191,23 +191,29 @@ class interpreter (pc: int) (stream: byte list) =
             end
             in (bytecode, asm)
 
-        method f1_inst op inst =
+        method f1_inst ?(store=false) op inst =
             let ac = self#addressing ((inst lsr 6) land 3) ~fp:true in
             let fsrc = self#addressing (inst land 0o77) ~fp:true in
-            sprintf "%s\t%s, %s" op fsrc ac
+            if store then
+                sprintf "%s\t%s, %s" op ac fsrc
+            else
+                sprintf "%s\t%s, %s" op fsrc ac
 
         method f2_inst op inst =
-            let fdst = self#addressing (inst land 0o77) ~fp:true in
-            sprintf "%s\t%s" op fdst
+            let target = self#addressing (inst land 0o77) ~fp:true in
+            sprintf "%s\t%s" op target
 
-        method f3_inst op inst =
+        method f3_inst ?(store=false) op inst =
             let ac = self#addressing ((inst lsr 6) land 3) ~fp:true in
             let src = self#addressing (inst land 0o77) ~fp:false in
-            sprintf "%s\t%s, %s" op src ac
+            if store then
+                sprintf "%s\t%s, %s" op ac src
+            else
+                sprintf "%s\t%s, %s" op src ac
 
         method f4_inst op inst =
-            let dst = self#addressing (inst land 0o77) ~fp:false in
-            sprintf "%s\t%s" op dst
+            let target = self#addressing (inst land 0o77) ~fp:false in
+            sprintf "%s\t%s" op target
 
         method fp =
             match inst with
@@ -233,11 +239,11 @@ class interpreter (pc: int) (stream: byte list) =
                     | 0b0101 -> self#f1_inst "ldf" inst
                     | 0b0110 -> self#f1_inst "subf" inst
                     | 0b0111 -> self#f1_inst "cmpf" inst
-                    | 0b1000 -> self#f1_inst "stf" inst
+                    | 0b1000 -> self#f1_inst "stf" inst ~store:true
                     | 0b1001 -> self#f1_inst "divf" inst
-                    | 0b1010 -> self#f3_inst "stexp" inst
-                    | 0b1011 -> self#f3_inst "stcfi" inst
-                    | 0b1100 -> self#f1_inst "stcfd" inst
+                    | 0b1010 -> self#f3_inst "stexp" inst ~store:true
+                    | 0b1011 -> self#f3_inst "stcfi" inst ~store:true
+                    | 0b1100 -> self#f1_inst "stcfd" inst ~store:true
                     | 0b1101 -> self#f3_inst "ldexp" inst
                     | 0b1110 -> self#f3_inst "ldcif" inst
                     | 0b1111 -> self#f1_inst "ldcdf" inst
