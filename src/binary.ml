@@ -113,14 +113,28 @@ class interpreter (pc: int) (stream: byte list) =
                 | 0o00020 -> self#single_reg_inst "rts" inst
                 | _ -> begin
                     match (inst lsr 5) with
-                    | 2 -> "; clear cond"
+                    | 2 -> begin
+                        match (inst land 0o77) with
+                        | 0o40 -> "nop"
+                        | 0o41 -> "clc"
+                        | 0o42 -> "clv"
+                        | 0o44 -> "clz"
+                        | 0o50 -> "cln"
+                        | 0o57 -> "ccc"
+                        | 0o61 -> "sec"
+                        | 0o62 -> "sev"
+                        | 0o64 -> "sez"
+                        | 0o70 -> "sen"
+                        | 0o77 -> "scc"
+                        | _ -> "[unknown cond-op]"
+                    end
                     | _ -> begin
                         match (inst lsr 6) land 0o1777 with
                         | 0o0001 -> self#single_op_inst "jmp" inst
                         | 0o0003 -> self#single_op_inst "swab" inst
-                        | 0o0064 -> "mark"
-                        | 0o0065 -> "mfpi"
-                        | 0o0066 -> "mtpi"
+                        | 0o0064 -> self#single_op_inst "mark" inst
+                        | 0o0065 -> self#single_op_inst "mfpi" inst
+                        | 0o0066 -> self#single_op_inst "mtpi" inst
                         | 0o0067 -> self#single_op_inst "sxt" inst
                         | _ -> begin
                             match (inst lsr 6) land 0o777 with
@@ -165,7 +179,7 @@ class interpreter (pc: int) (stream: byte list) =
                                         | 0o072 -> self#eis_inst "ash" inst
                                         | 0o073 -> self#eis_inst "ashc" inst
                                         | 0o074 -> self#eis_inst "xor" inst ~dst:true
-                                        | 0o077 -> "sob"
+                                        | 0o077 -> self#eis_inst "sob" inst
                                         | _ -> begin
                                             match (inst lsr 12) land 0o17 with
                                             | 0o06 -> self#double_op_inst "add" inst
