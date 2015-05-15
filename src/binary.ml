@@ -34,7 +34,7 @@ class interpreter (pc: int) (stream: byte list) =
         val mutable residue = snd (popw stream)
         method residue = residue
         method addressing ?(fp=false) mode =
-            let oprand m =
+            let oprand ?(deferred=true) m =
                 let i = (m land 7) in
                 if i = 7 then
                     let (v,code) = popw residue in
@@ -49,7 +49,7 @@ class interpreter (pc: int) (stream: byte list) =
                     | _ -> raise InvalidMode
                 else if i = 6 then
                     "sp"
-                else sprintf (if fp then "fr%d" else "r%d") i
+                else sprintf (if fp && not deferred then "fr%d" else "r%d") i
             in
             if (mode land 7) = 7 then
                 match (mode lsr 3) land 7 with
@@ -57,7 +57,7 @@ class interpreter (pc: int) (stream: byte list) =
                 | _ -> oprand mode
             else
                 match (mode lsr 3) land 7 with
-                | 0 -> sprintf "%s"     (oprand mode)
+                | 0 -> sprintf "%s"     (oprand mode ~deferred:false)
                 | 1 -> sprintf "(%s)"   (oprand mode)
                 | 2 -> sprintf "(%s)+"  (oprand mode)
                 | 3 -> sprintf "@(%s)+" (oprand mode)
