@@ -86,15 +86,13 @@ class interpreter (pc: int) (stream: byte list) =
             let dst = self#addressing inst in
             sprintf "%s\t%s, %s" op src dst
 
-        method reg_op_inst op inst =
+        method eis_inst ?(dst=false) op inst =
             let reg = self#addressing ((inst lsr 6) land 7) in
             let src = self#addressing inst in
-            sprintf "%s\t%s, %s" op src reg
-
-        method jsr_inst op inst =
-            let reg = self#addressing ((inst lsr 6) land 7) in
-            let src = self#addressing inst in
-            sprintf "%s\t%s, %s" op reg src
+            if dst then
+                sprintf "%s\t%s, %s" op reg src
+            else
+                sprintf "%s\t%s, %s" op src reg
 
         method branch_insr op inst =
             let offset = (inst land 0xff) in
@@ -161,12 +159,12 @@ class interpreter (pc: int) (stream: byte list) =
                                     | 135 -> self#branch_insr "bcs" inst
                                     | _ -> begin
                                         match (inst lsr 9) land 0o177 with
-                                        | 0o004 -> self#jsr_inst    "jsr" inst
-                                        | 0o070 -> self#reg_op_inst "mul" inst
-                                        | 0o071 -> self#reg_op_inst "div" inst
-                                        | 0o072 -> self#reg_op_inst "ash" inst
-                                        | 0o073 -> self#reg_op_inst "ashc" inst
-                                        | 0o074 -> self#reg_op_inst "xor" inst
+                                        | 0o004 -> self#eis_inst "jsr" inst ~dst:true
+                                        | 0o070 -> self#eis_inst "mul" inst
+                                        | 0o071 -> self#eis_inst "div" inst
+                                        | 0o072 -> self#eis_inst "ash" inst
+                                        | 0o073 -> self#eis_inst "ashc" inst
+                                        | 0o074 -> self#eis_inst "xor" inst ~dst:true
                                         | 0o077 -> "sob"
                                         | _ -> begin
                                             match (inst lsr 12) land 0o17 with
