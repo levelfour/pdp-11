@@ -43,9 +43,9 @@ class interpreter (pc: int) (stream: byte list) =
                     residue <- code;
                     match (m lsr 3) land 7 with
                     | 2 -> sprintf "$%s"  (signedo v)
-                    | 3 -> sprintf "@#%d" (signedw v)
+                    | 3 -> sprintf "*#%d" (signedw v)
                     | 6 -> string_of_int  ((signedw v) + pc + 2)
-                    | 7 -> sprintf "@%d"  (signedw v)
+                    | 7 -> sprintf "*%d"  (signedw v)
                     | _ -> raise InvalidMode
                 else if i = 6 then
                     "sp"
@@ -54,15 +54,18 @@ class interpreter (pc: int) (stream: byte list) =
             if (mode land 7) = 7 then
                 match (mode lsr 3) land 7 with
                 | 0 -> "pc"
+                | 1 -> "(pc)"
+                | 4 -> "-(pc)"
+                | 5 -> "*-(pc)"
                 | _ -> oprand mode
             else
                 match (mode lsr 3) land 7 with
                 | 0 -> sprintf "%s"     (oprand mode ~deferred:false)
                 | 1 -> sprintf "(%s)"   (oprand mode)
                 | 2 -> sprintf "(%s)+"  (oprand mode)
-                | 3 -> sprintf "@(%s)+" (oprand mode)
+                | 3 -> sprintf "*(%s)+" (oprand mode)
                 | 4 -> sprintf "-(%s)"  (oprand mode)
-                | 5 -> sprintf "@-(%s)" (oprand mode)
+                | 5 -> sprintf "*-(%s)" (oprand mode)
                 | 6 -> begin
                     let (v,code) = popw residue in
                     pc <- pc + 2;
@@ -70,7 +73,7 @@ class interpreter (pc: int) (stream: byte list) =
                     bytecode <- bytecode @ [v];
                     sprintf "%s(%s)" (signedo v) (oprand mode)
                 end
-                | 7 -> sprintf "@X(%s)" (oprand mode)
+                | 7 -> sprintf "*X(%s)" (oprand mode)
                 | _ -> raise InvalidMode
 
         method single_op_inst op inst =
@@ -191,7 +194,7 @@ class interpreter (pc: int) (stream: byte list) =
                                                 | 0o3 -> self#double_op_inst (if (inst lsr 15) == 1 then "bitb" else "bit") inst
                                                 | 0o4 -> self#double_op_inst (if (inst lsr 15) == 1 then "bicb" else "bic") inst
                                                 | 0o5 -> self#double_op_inst (if (inst lsr 15) == 1 then "bisb" else "bis") inst
-                                                | _ -> "?"
+                                                | _ -> sprintf ".word\t%o" inst
                                             end
                                         end
                                     end
