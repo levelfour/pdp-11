@@ -299,38 +299,65 @@ class interpreter (pc: int) (stream: byte list) =
             let target = self#addressing (inst land 0o77) ~fp:false in
             sprintf "%s\t%s" op target
 
+        method cfcc = "cfcc"
+        method setf = "setf"
+        method seti = "seti"
+        method setd = "setd"
+        method setl = "setl"
+        method ldfps = self#f4_inst "ldfps" inst
+        method stfps = self#f4_inst "stfps" inst
+        method stst = self#f4_inst "stst" inst
+        method clrf = self#f2_inst "clrf" inst
+        method tstf = self#f2_inst "tstf" inst
+        method absf = self#f2_inst "absf" inst
+        method negf = self#f2_inst "negf" inst
+        method mulf = self#f1_inst "mulf" inst
+        method modf = self#f1_inst "modf" inst
+        method addf = self#f1_inst "addf" inst
+        method ldf = self#f1_inst "ldf" inst
+        method subf = self#f1_inst "subf" inst
+        method cmpf = self#f1_inst "cmpf" inst
+        method stf = self#f1_inst "stf" inst ~store:true
+        method divf = self#f1_inst "divf" inst
+        method stexp = self#f3_inst "stexp" inst ~store:true
+        method stcfi = self#f3_inst "stcfi" inst ~store:true
+        method stcfd = self#f1_inst "stcfd" inst ~store:true
+        method ldexp = self#f3_inst "ldexp" inst
+        method ldcif = self#f3_inst "ldcif" inst
+        method ldcdf = self#f1_inst "ldcdf" inst
+
         method fp =
             match inst with
-            | 0o170000 -> "cfcc"
-            | 0o170001 -> "setf"
-            | 0o170002 -> "seti"
-            | 0o170011 -> "setd"
-            | 0o170012 -> "setl"
+            | 0o170000 -> self#cfcc
+            | 0o170001 -> self#setf
+            | 0o170002 -> self#seti
+            | 0o170011 -> self#setd
+            | 0o170012 -> self#setl
             | _ -> begin
                 match ((inst lsr 6) land 0o77) with
-                | 0o01 -> self#f4_inst "ldfps" inst
-                | 0o02 -> self#f4_inst "stfps" inst
-                | 0o03 -> self#f4_inst "stst" inst
-                | 0o04 -> self#f2_inst "clrf" inst
-                | 0o05 -> self#f2_inst "tstf" inst
-                | 0o06 -> self#f2_inst "absf" inst
-                | 0o07 -> self#f2_inst "negf" inst
+                | 0o01 -> self#ldfps
+                | 0o02 -> self#stfps
+                | 0o03 -> self#stst 
+                | 0o04 -> self#clrf 
+                | 0o05 -> self#tstf 
+                | 0o06 -> self#absf 
+                | 0o07 -> self#negf 
                 | _ -> begin
                     match ((inst lsr 8) land 15) with
-                    | 0b0010 -> self#f1_inst "mulf" inst
-                    | 0b0011 -> self#f1_inst "modf" inst
-                    | 0b0100 -> self#f1_inst "addf" inst
-                    | 0b0101 -> self#f1_inst "ldf" inst
-                    | 0b0110 -> self#f1_inst "subf" inst
-                    | 0b0111 -> self#f1_inst "cmpf" inst
-                    | 0b1000 -> self#f1_inst "stf" inst ~store:true
-                    | 0b1001 -> self#f1_inst "divf" inst
-                    | 0b1010 -> self#f3_inst "stexp" inst ~store:true
-                    | 0b1011 -> self#f3_inst "stcfi" inst ~store:true
-                    | 0b1100 -> self#f1_inst "stcfd" inst ~store:true
-                    | 0b1101 -> self#f3_inst "ldexp" inst
-                    | 0b1110 -> self#f3_inst "ldcif" inst
-                    | 0b1111 -> self#f1_inst "ldcdf" inst
+                    | 0b0010 -> self#mulf 
+                    | 0b0011 -> self#modf 
+                    | 0b0100 -> self#addf 
+                    | 0b0101 -> self#ldf
+                    | 0b0110 -> self#subf 
+                    | 0b0111 -> self#cmpf 
+                    | 0b1000 -> self#stf
+                    | 0b1001 -> self#divf 
+                    | 0b1010 -> self#stexp
+                    | 0b1011 -> self#stcfi
+                    | 0b1100 -> self#stcfd
+                    | 0b1101 -> self#ldexp
+                    | 0b1110 -> self#ldcif
+                    | 0b1111 -> self#ldcdf
                     | _ -> "?"
                 end
             end
