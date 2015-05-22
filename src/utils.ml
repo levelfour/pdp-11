@@ -1,5 +1,10 @@
 open Printf
 
+type byte = int
+
+exception OutOfRange
+exception InvalidMode
+
 (* get the first element of tuple *)
 let fst tuple =
     match tuple with
@@ -37,3 +42,12 @@ let signedw n =
 (* convert unsigned word -> string (as signed octal word) *)
 let signedo o =
     sprintf "%s%o" (if not (posw o) then "-" else "") (absw (signedw o))
+
+(* pop word from stream according to little-endian *)
+let popw stream =
+    try
+        ((List.nth stream 0) + ((List.nth stream 1) lsl 8),
+        ExtList.List.drop 2 stream)
+    with Failure("nth") ->
+        raise OutOfRange
+

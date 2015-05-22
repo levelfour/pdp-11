@@ -2,8 +2,10 @@
 
 FILES[] =
 	pdp11
-	binary
 	utils
+	binary
+	disassembler
+	simulator
 
 USE_OCAMLFIND = true
 OCAMLPACKS[] =
