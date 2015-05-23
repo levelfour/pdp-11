@@ -23,7 +23,7 @@ let _ =
                 in
                 disasall bin;
             else
-                printf "simulator mode\n";
+                bin#exec;
             close_in ic
         with e ->
             close_in_noerr ic;

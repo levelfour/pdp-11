@@ -2,76 +2,117 @@ open Printf
 open Utils
 
 (* interpreter object of byte code *)
-class simulator (pc: int) (stream: byte list) =
+class simulator (arch: architecture) (stream: byte list) mem =
     object(self)
         val inst = fst (popw stream)
-        val mutable pc = pc
+        val mutable pc = arch.r7
         val mutable bytecode = [fst (popw stream)]
         val mutable residue = snd (popw stream)
         method residue = residue
         method addressing ?(fp=false) mode =
-            let oprand ?(deferred=true) m =
+            let oprand m =
                 let i = (m land 7) in
-                if i = 7 then
-                    let (v,code) = popw residue in
-                    pc <- pc + 2;
-                    bytecode <- bytecode @ [v];
-                    residue <- code;
-                    match (m lsr 3) land 7 with
-                    | 2 -> sprintf "$%s"  (signedo v)
-                    | 3 -> sprintf "*#%d" (signedw v)
-                    | 6 -> string_of_int  ((signedw v) + pc + 2)
-                    | 7 -> sprintf "*%d"  (signedw v)
+                if fp then
+                    raise InvalidMode
+                else
+                    match i with
+                    | 0 -> arch.r0
+                    | 1 -> arch.r1
+                    | 2 -> arch.r2
+                    | 3 -> arch.r3
+                    | 4 -> arch.r4
+                    | 5 -> arch.r5
+                    | 6 -> arch.r6
+                    | 7 -> arch.r7
                     | _ -> raise InvalidMode
-                else if i = 6 then
-                    "sp"
-                else sprintf (if fp && not deferred then "fr%d" else "r%d") i
             in
-            if (mode land 7) = 7 then
-                match (mode lsr 3) land 7 with
-                | 0 -> "pc"
-                | 1 -> "(pc)"
-                | 4 -> "-(pc)"
-                | 5 -> "*-(pc)"
-                | _ -> oprand mode
-            else
-                match (mode lsr 3) land 7 with
-                | 0 -> sprintf "%s"     (oprand mode ~deferred:false)
-                | 1 -> sprintf "(%s)"   (oprand mode)
-                | 2 -> sprintf "(%s)+"  (oprand mode)
-                | 3 -> sprintf "*(%s)+" (oprand mode)
-                | 4 -> sprintf "-(%s)"  (oprand mode)
-                | 5 -> sprintf "*-(%s)" (oprand mode)
-                | 6 -> begin
-                    let (v,code) = popw residue in
-                    pc <- pc + 2;
-                    residue <- code;
-                    bytecode <- bytecode @ [v];
-                    sprintf "%s(%s)" (signedo v) (oprand mode)
-                end
-                | 7 -> sprintf "*X(%s)" (oprand mode)
+            match (mode lsr 3) land 7 with
+            | 0 -> (oprand mode)
+            | 1 -> readw (oprand mode) mem
+            | 2 -> begin
+                match (mode land 7) with
+                | 0 -> arch.r0 <- arch.r0 + 2; readw (arch.r0 - 2) mem;
+                | 1 -> arch.r1 <- arch.r1 + 2; readw (arch.r1 - 2) mem;
+                | 2 -> arch.r2 <- arch.r2 + 2; readw (arch.r2 - 2) mem;
+                | 3 -> arch.r3 <- arch.r3 + 2; readw (arch.r3 - 2) mem;
+                | 4 -> arch.r4 <- arch.r4 + 2; readw (arch.r4 - 2) mem;
+                | 5 -> arch.r5 <- arch.r5 + 2; readw (arch.r5 - 2) mem;
+                | 6 -> arch.r6 <- arch.r6 + 2; readw (arch.r6 - 2) mem;
+                | 7 -> arch.r7 <- arch.r7 + 2; readw (arch.r7 - 2) mem;
                 | _ -> raise InvalidMode
+            end
+            | 3 -> begin
+                match (mode land 7) with
+                | 0 -> arch.r0 <- arch.r0 + 2; readw (readw (arch.r0 - 2) mem) mem;
+                | 1 -> arch.r1 <- arch.r1 + 2; readw (readw (arch.r1 - 2) mem) mem;
+                | 2 -> arch.r2 <- arch.r2 + 2; readw (readw (arch.r2 - 2) mem) mem;
+                | 3 -> arch.r3 <- arch.r3 + 2; readw (readw (arch.r3 - 2) mem) mem;
+                | 4 -> arch.r4 <- arch.r4 + 2; readw (readw (arch.r4 - 2) mem) mem;
+                | 5 -> arch.r5 <- arch.r5 + 2; readw (readw (arch.r5 - 2) mem) mem;
+                | 6 -> arch.r6 <- arch.r6 + 2; readw (readw (arch.r6 - 2) mem) mem;
+                | 7 -> arch.r7 <- arch.r7 + 2; readw (readw (arch.r7 - 2) mem) mem;
+                | _ -> raise InvalidMode
+            end
+            | 4 -> begin
+                match (mode land 7) with
+                | 0 -> arch.r0 <- arch.r0 - 2; readw arch.r0 mem;
+                | 1 -> arch.r1 <- arch.r1 - 2; readw arch.r1 mem;
+                | 2 -> arch.r2 <- arch.r2 - 2; readw arch.r2 mem;
+                | 3 -> arch.r3 <- arch.r3 - 2; readw arch.r3 mem;
+                | 4 -> arch.r4 <- arch.r4 - 2; readw arch.r4 mem;
+                | 5 -> arch.r5 <- arch.r5 - 2; readw arch.r5 mem;
+                | 6 -> arch.r6 <- arch.r6 - 2; readw arch.r6 mem;
+                | 7 -> arch.r7 <- arch.r7 - 2; readw arch.r7 mem;
+                | _ -> raise InvalidMode
+            end
+            | 5 -> begin
+                match (mode land 7) with
+                | 0 -> arch.r0 <- arch.r0 - 2; readw (readw arch.r0 mem) mem;
+                | 1 -> arch.r1 <- arch.r1 - 2; readw (readw arch.r1 mem) mem;
+                | 2 -> arch.r2 <- arch.r2 - 2; readw (readw arch.r2 mem) mem;
+                | 3 -> arch.r3 <- arch.r3 - 2; readw (readw arch.r3 mem) mem;
+                | 4 -> arch.r4 <- arch.r4 - 2; readw (readw arch.r4 mem) mem;
+                | 5 -> arch.r5 <- arch.r5 - 2; readw (readw arch.r5 mem) mem;
+                | 6 -> arch.r6 <- arch.r6 - 2; readw (readw arch.r6 mem) mem;
+                | 7 -> arch.r7 <- arch.r7 - 2; readw (readw arch.r7 mem) mem;
+                | _ -> raise InvalidMode
+            end
+            | 6 -> begin
+                let (v,code) = popw residue in
+                pc <- pc + 2;
+                residue <- code;
+                bytecode <- bytecode @ [v];
+                readw ((oprand mode) + (signedw v)) mem
+            end
+            | 7 -> begin
+                let (v,code) = popw residue in
+                pc <- pc + 2;
+                residue <- code;
+                bytecode <- bytecode @ [v];
+                readw (readw ((oprand mode) + (signedw v)) mem) mem
+            end
+            | _ -> raise InvalidMode
 
         method single_op_inst op inst =
             let dst = self#addressing inst in
-            sprintf "%s\t%s" op dst
+            sprintf "%s\t%d" op dst
 
         method single_reg_inst op inst =
             let reg = self#addressing (inst land 0b111) in
-            sprintf "%s\t%s" op reg
+            sprintf "%s\t%d" op reg
 
         method double_op_inst op inst =
             let src = self#addressing (inst lsr 6) in
             let dst = self#addressing inst in
-            sprintf "%s\t%s, %s" op src dst
+            sprintf "%s\t%d, %d" op src dst
 
         method eis_inst ?(dst=false) op inst =
             let reg = self#addressing ((inst lsr 6) land 7) in
             let src = self#addressing inst in
             if dst then
-                sprintf "%s\t%s, %s" op reg src
+                sprintf "%s\t%d, %d" op reg src
             else
-                sprintf "%s\t%s, %s" op src reg
+                sprintf "%s\t%d, %d" op src reg
 
         method branch_insr op inst =
             let offset = (inst land 0xff) in
@@ -255,25 +296,25 @@ class simulator (pc: int) (stream: byte list) =
             let ac = self#addressing ((inst lsr 6) land 3) ~fp:true in
             let fsrc = self#addressing (inst land 0o77) ~fp:true in
             if store then
-                sprintf "%s\t%s, %s" op ac fsrc
+                sprintf "%s\t%d, %d" op ac fsrc
             else
-                sprintf "%s\t%s, %s" op fsrc ac
+                sprintf "%s\t%d, %d" op fsrc ac
 
         method f2_inst op inst =
             let target = self#addressing (inst land 0o77) ~fp:true in
-            sprintf "%s\t%s" op target
+            sprintf "%s\t%d" op target
 
         method f3_inst ?(store=false) op inst =
             let ac = self#addressing ((inst lsr 6) land 3) ~fp:true in
             let src = self#addressing (inst land 0o77) ~fp:false in
             if store then
-                sprintf "%s\t%s, %s" op ac src
+                sprintf "%s\t%d, %d" op ac src
             else
-                sprintf "%s\t%s, %s" op src ac
+                sprintf "%s\t%d, %d" op src ac
 
         method f4_inst op inst =
             let target = self#addressing (inst land 0o77) ~fp:false in
-            sprintf "%s\t%s" op target
+            sprintf "%s\t%d" op target
 
         method cfcc = "cfcc"
         method setf = "setf"

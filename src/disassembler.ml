@@ -49,7 +49,13 @@ class disassembler (pc: int) (stream: byte list) =
                     bytecode <- bytecode @ [v];
                     sprintf "%s(%s)" (signedo v) (oprand mode)
                 end
-                | 7 -> sprintf "*X(%s)" (oprand mode)
+                | 7 -> begin
+                    let (v,code) = popw residue in
+                    pc <- pc + 2;
+                    residue <- code;
+                    bytecode <- bytecode @ [v];
+                    sprintf "*%s(%s)" (signedo v) (oprand mode)
+                end
                 | _ -> raise InvalidMode
 
         method single_op_inst op inst =

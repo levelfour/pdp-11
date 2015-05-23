@@ -1,6 +1,6 @@
-open Printf
 open Utils
 open Disassembler
+open Simulator
 
 (* read word from stream according to little-endian *)
 let rec readw i stream =
@@ -24,8 +24,8 @@ class a_out_format (stream: byte list) =
         val a_entry  = readw 10 stream
         val a_trsize = readw 12 stream
         val a_drsize = readw 14 stream
+        val arch     = { r0=0; r1=0; r2=0; r3=0; r4=0; r5=0; r6=0; r7=0; ps=0 }
         val mutable code = ExtList.List.take (readw 2 stream) (ExtList.List.drop 16 stream)
-        val mutable pc = 0
         method magic     = a_magic
         method text_size = a_text
         method data_size = a_data
@@ -33,12 +33,21 @@ class a_out_format (stream: byte list) =
         method code      = code
         method disas     =
             try
-                let itp             = new disassembler pc code in
+                let itp             = new disassembler arch.r7 code in
                 let (bytecode, asm) = itp#interpret in
-                let cur_pc          = pc in
+                let cur_pc          = arch.r7 in
                 code <- itp#residue;
-                pc <- pc + (List.length bytecode) * 2;
+                arch.r7 <- arch.r7 + (List.length bytecode) * 2;
                 (cur_pc, bytecode, asm)
+            with e ->
+                raise e
+        method exec      =
+            try
+                let mem = Array.init 0xffff (fun _ -> 0) in
+                let itp = new simulator arch code mem in
+                let (bytecode, asm) = itp#interpret in
+                arch.r7 <- arch.r7 + (List.length bytecode) * 2;
+                Printf.printf "simulator mode %n\n" (mem.(0))
             with e ->
                 raise e
     end
@@ -55,7 +64,7 @@ let xxd s =
     let rec xxd_sub stream counter =
         match stream with
         | byte::s -> (
-            printf "%02x%s" byte (
+            Printf.printf "%02x%s" byte (
                 if counter mod 16 = 0 then "\n"
                 else if counter mod 2 = 0 then " " else "");
             xxd_sub s (counter+1))

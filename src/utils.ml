@@ -2,6 +2,18 @@ open Printf
 
 type byte = int
 
+type architecture = {
+    mutable r0: int;
+    mutable r1: int;
+    mutable r2: int;
+    mutable r3: int;
+    mutable r4: int;
+    mutable r5: int;
+    mutable r6: int;
+    mutable r7: int;
+    mutable ps: int;
+}
+
 exception OutOfRange
 exception InvalidMode
 
@@ -49,5 +61,12 @@ let popw stream =
         ((List.nth stream 0) + ((List.nth stream 1) lsl 8),
         ExtList.List.drop 2 stream)
     with Failure("nth") ->
+        raise OutOfRange
+
+(* read word from memory according to little-endian *)
+let readw n mem =
+    try
+        ((mem.(n)) + ((mem.(n+1)) lsl 8))
+    with Invalid_argument "index out of bounds" ->
         raise OutOfRange
 
